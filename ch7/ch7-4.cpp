@@ -53,12 +53,23 @@ void diaplay(AdjMatrix &t)
 void ShortestPathFloyd(AdjMatrix &t, int v0, int v1)
 {
     int dist[MAX][MAX];
+    string path[MAX][MAX]={""};
     for (int i = 0; i < t.vexnum; i++)
     {
         for (int j = 0; j < t.vexnum; j++)
         {
             dist[i][j] = t.arc[i][j];
+            path[i][j] = to_string(i);
         }
+    }
+
+    for(int i=0;i<t.vexnum;i++)
+    {
+        for(int j=0;j<t.vexnum;j++)
+        {
+            cout<<path[i][j]<<"\t";
+        }
+        cout<<endl;
     }
 
     for (int k = 0; k < t.vexnum; k++)
@@ -67,12 +78,29 @@ void ShortestPathFloyd(AdjMatrix &t, int v0, int v1)
         {
             for (int j = 0; j < t.vexnum; j++)
             {
-                dist[i][j] = min(max(dist[i][k], dist[k][j]), dist[i][j]);
+                if(dist[i][k]>dist[k][j])
+                {
+                    if(dist[i][k]<dist[i][j])
+                    {
+                        dist[i][j] = dist[i][k];
+                        path[i][j] = path[i][j]+"->"+to_string(k);
+                    }
+                }
+                else
+                {
+                    if(dist[k][j]<dist[i][j])
+                    {
+                        dist[i][j] = dist[k][j];
+                        path[i][j] = path[i][j]+"->"+to_string(k);
+                    }
+                }
+                //dist[i][j] = min(max(dist[i][k], dist[k][j]), dist[i][j]);
             }
         }
     }
 
     cout << "最大噪声值为：" << dist[v0][v1] << endl;
+    cout << "最大噪声路径为：" << path[v0][v1] << "->" << v1 <<endl;
 }
 
 int main()
