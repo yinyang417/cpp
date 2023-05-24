@@ -49,13 +49,13 @@ int degree(Tree& t)//广度优先遍历
 	queue<TreeNode*> q;
 	TreeNode* p;
 	int max = 0;
-	q.push(t);
+	q.push(t);//根节点入队
 	while (!q.empty())
 	{
-		int deg = q.size();
+		int deg = q.size();//记录最大度数
 		for (int i = 0; i < deg; i++)
 		{
-			p = q.front();
+			p = q.front();//p出队
 			q.pop();
 			p = p->firstchild;
 			while (p != NULL)//将下一层的所有节点入队
@@ -64,7 +64,7 @@ int degree(Tree& t)//广度优先遍历
 				p = p->nextsibling;
 			}
 		}
-		if (max < deg)
+		if (max < deg)//将最大度数赋值给max
 		{
 			max = deg;
 		}
