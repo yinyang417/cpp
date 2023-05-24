@@ -37,7 +37,7 @@ public:
     {
         int temp = row * 1000 + col;
         int p = 11987;
-         return (temp%p+p)%p;
+        return temp%p;
     }
 
     int Collision(int index, int count)
