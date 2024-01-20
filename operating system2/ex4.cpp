@@ -219,11 +219,8 @@ void openFile() {
 	else {
 		bool success = 1;
 		while (true) {
-			//cout << "请输入此次打开的二级保护码：";
 			string code;
 			code = mfd[nowuser].f[fileId].p_code;
-			//cin >> code;
-			//验证二级保护码
 			for (int i = 0; i < 3; i++) {
 				if (code[i] > mfd[nowuser].f[fileId].p_code[i]||code[i]<'0' || code[i]>'1') {
 					success = 0; break;
