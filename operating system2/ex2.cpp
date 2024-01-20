@@ -1,418 +1,416 @@
-#include<bits/stdc++.h>
-
+#include <bits/stdc++.h>
 using namespace std;
+char ch = 'y'; // 是否启用银行家算法进行防止死锁？y/n
+int m = 3;     // m类资源
+int n = 5;     // n个进程数
+// 要用到的数组
+vector<int> available;          // 可利用资源向量,m个
+vector<vector<int>> Max;        // 最大需求矩阵，n行m列
+vector<vector<int>> allocation; // 分配矩阵，同上
+vector<vector<int>> need;       // 需求矩阵，同上 Need［i,j］=Max［i,j］-Allocation［i,j］
+vector<vector<int>> request;    // 第n个进程请求第m个资源
+vector<int> worknow;            // 分配时第i个进程，m个资源初始还剩多少个可分配的数量。m个
+vector<bool> finish;            // 系统是否有足够的资源分配,是否已经分配完毕？n个
+vector<vector<int>> WaddA;      // W+A，若能够分配，分配后系统中拥有的资源，给下一个，n*m
+vector<int> p;                  // 记录进程号,n个
+vector<vector<int>> work;       // 记录表中你每一个进程的work n*m
 
-const int RESOURCE_TYPES = 5;
-const int PROCESS_NUMS = 5;
-const int p = 5; // 进程数
-const int r = 4; // 资源种类
-int num = 1; // 需要分配资源的进程序号
-
-// Process Control Block (PCB) structure
-struct PCB
+void menu()
 {
-    int id;
-    int priority;
-    int cpuTime;
-    int allTime;
-    std::string state;
-    int waitingTime;    // Added for performance metrics
-    int turnaroundTime; // Added for performance metrics
-    int submissionTime;
-    int allocation[RESOURCE_TYPES];
-    int claim[RESOURCE_TYPES];
-};
-
-// Function to initialize processes with random values
-void InitializeProcesses(vector<PCB> &processes, int n)
-{
-    srand(time(0));
-    for (int i = 0; i < n; ++i)
-    {
-        PCB process;
-        process.id = i + 1;
-        process.priority = rand() % 10; // 为简单起见，随机生成优先级
-        process.cpuTime = 0;
-        process.allTime = 3 + rand() % 5; // 随机生成所需的时间片
-        process.state = "W";              // 初始状态为等待
-        process.waitingTime = 0;
-        process.turnaroundTime = 0;
-        process.submissionTime = rand() % 15;
-        printf("CLAIM OF PROCESS %d IS:", i + 1);
-        for (int j = 0; j < RESOURCE_TYPES; j++)
-            cin >> process.claim[i];
-        processes.push_back(process);
-    }
-}
-
-// Function to display the current state of processes
-void DisplayCPUUsage(const vector<PCB> &processes)
-{
-    cout << "ID\tPriority\tCPU Time\tAll Time\tState\tWaiting Time\tTurnaround Time\n";
-    for (const auto &process : processes)
-    {
-        cout << process.id << "\t" << process.priority << "\t\t"
-             << process.cpuTime << "\t\t" << process.allTime << "\t\t"
-             << process.state << "\t\t" << process.waitingTime << "\t\t"
-             << process.turnaroundTime << endl;
-    }
     cout << endl;
-}
-
-// Function to display the current state of processes
-void DisplayResourceUsage(const vector<PCB> &processes)
-{
-    cout << "ID\tPriority\tCPU Time\tAll Time\tState\tWaiting Time\tTurnaround Time\n";
-    for (const auto &process : processes)
-    {
-        cout << process.id << "\t" << process.priority << "\t\t"
-             << process.cpuTime << "\t\t" << process.allTime << "\t\t"
-             << process.state << "\t\t" << process.waitingTime << "\t\t"
-             << process.turnaroundTime << endl;
-    }
     cout << endl;
+    cout << "\t  死锁观察与避免实验\n"
+         << endl;
+    cout << "\t| ==============================|" << endl;
+    cout << "\t| 1. 初始化\t\t\t|" << endl;
+    cout << "\t| 2. 查看当前资源分配表\t\t|" << endl;
+    cout << "\t| 3. 请求资源\t\t\t|" << endl;
+    cout << "\t| 4. 退出\t\t\t|" << endl;
 }
 
-// Priority Scheduling Algorithm
-void PriorityScheduling(vector<PCB> &processes, bool display)
+void initArray()
 {
-    sort(processes.begin(), processes.end(), [](const PCB &a, const PCB &b)
-         {
-             return a.priority > b.priority; // 按优先级排序（高优先级优先）
-         });
-
-    int currentTime = 0;
-    int waitingProcesses = processes.size();
-
-    for (auto &currentprocess : processes)
+    n = 5;
+    m = 3;
+    // 初始化全为0
+    Max.resize(n);
+    allocation.resize(n);
+    need.resize(n);
+    request.resize(n);
+    WaddA.resize(n);
+    work.resize(n);
+    for (int i = 0; i < n; i++)
     {
-        while (true)
+        // n个进程初始化
+        p.push_back(i);
+        finish.push_back(false);
+        for (int j = 0; j < m; j++)
         {
-            currentprocess.cpuTime++;
-            currentTime++;
-
-            for (auto &process : processes)
+            if (i == 0)
             {
-                if (process.state == "F")
-                    continue;
-                process.waitingTime++;
+                // m个资源初始化
+                worknow.push_back(0);
+                available.push_back(0);
             }
-            currentprocess.waitingTime--;
-
-            if (currentprocess.cpuTime >= currentprocess.allTime)
-            {
-                currentprocess.turnaroundTime = currentTime;
-                currentprocess.state = "F";
-                waitingProcesses--;
-            }
-            if (display)
-            {
-                cout << "Running Process " << currentprocess.id << endl;
-                DisplayCPUUsage(processes);
-            }
-            if (currentprocess.cpuTime >= currentprocess.allTime)
-                break;
+            // 各类矩阵初始化
+            Max[i].push_back(0);
+            allocation[i].push_back(0);
+            need[i].push_back(0);
+            request[i].push_back(0);
+            WaddA[i].push_back(0);
+            work[i].push_back(0);
         }
     }
 }
 
-// Round Robin Scheduling Algorithm
-void RoundRobinScheduling(vector<PCB> &processes, bool display, int timeSlice)
+void init()
 {
-    int currentTime = 0;
-    int waitingProcess = processes.size();
+    initArray();
 
-    while (waitingProcess)
-    {
-        for (auto &currentprocess : processes)
-        {
-            if (currentprocess.state == "F")
-                continue;
+    vector<vector<int>> maxData = {{7, 3, 5}, {3, 2, 2}, {9, 0, 2}, {2, 2, 2}, {4, 3, 3}};
+    vector<vector<int>> allocData = {{0, 1, 0}, {2, 0, 0}, {3, 0, 2}, {2, 1, 1}, {0, 0, 2}};
 
-            currentprocess.waitingTime -= timeSlice;
-            currentprocess.cpuTime += timeSlice;
-            currentTime += timeSlice;
-
-            for (auto &process : processes)
-            {
-                if (process.state == "F")
-                    continue;
-                process.waitingTime += timeSlice;
-            }
-
-            if (currentprocess.cpuTime >= currentprocess.allTime)
-            {
-                currentprocess.turnaroundTime = currentTime;
-                currentprocess.state = "F";
-                waitingProcess--;
-            }
-
-            if (display)
-            {
-                cout << "Running Process " << currentprocess.id << endl;
-                DisplayCPUUsage(processes);
-            }
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            Max[i][j] = maxData[i][j];
+            allocation[i][j] = allocData[i][j];
         }
     }
-}
 
-// HRRN Scheduling Algorithm
-void HRRNScheduling(vector<PCB> &processes, bool display)
-{
-    int currentTime = 0;
-    int waitingProcesses = processes.size();
-
-    while (waitingProcesses)
-    {
-        // 计算每个进程的响应比
-        for (auto &process : processes)
-        {
-            double responseRatio = (currentTime - process.cpuTime + process.allTime) / static_cast<double>(process.allTime);
-            process.priority = responseRatio;
-            if (process.state == "F")
-                continue;
-            process.waitingTime++;
-        }
-
-        // 根据响应比排序进程（高响应比优先）
-        sort(processes.begin(), processes.begin() + waitingProcesses, [](const PCB &a, const PCB &b)
-             { return a.priority > b.priority; });
-
-        // 运行响应比最高的进程
-        auto &currentprocess = processes.front();
-
-        currentprocess.waitingTime--;
-        currentprocess.cpuTime++;
-        currentTime++;
-
-        if (currentprocess.cpuTime >= currentprocess.allTime)
-        {
-            currentprocess.turnaroundTime = currentTime - currentprocess.waitingTime;
-            currentprocess.state = "F"; // 将进程状态设置为完成
-            rotate(processes.begin(), processes.begin() + 1, processes.end());
-            waitingProcesses--;
-        }
-
-        if (display)
-        {
-            cout << "Running Process " << currentprocess.id << endl;
-            DisplayCPUUsage(processes);
-        }
+    vector<int> availableData = {3, 3, 2};
+    for (int i = 0; i < m; i++) {
+        available[i] = availableData[i];
     }
+
 }
 
-void init_request(int request[r])
+void print()
 {
-    // 初始化request矩阵
-    cout << "Input the number of request:" << endl;
-    cin >> num;
-    num -= 1; // 下标减1
-    cout << "Input the request vector:" << endl;
-    for (int i = 0; i < r; i++)
-        cin >> request[i];
-}
-
-void init_matrix(int maximum[p][r], int allocation[p][r], int need[p][r], int available[r], int request[r])
-{
-    // 初始化函数
-    cout << "Input the Allocation matrix:" << endl;
-    for (int i = 0; i < p; i++)
-        for (int j = 0; j < r; j++)
-            cin >> allocation[i][j];
-    cout << "Input the Need matrix:" << endl;
-    for (int i = 0; i < p; i++)
-        for (int j = 0; j < r; j++)
-            cin >> need[i][j];
-    // cout<<"Input the Max matrix:"<<endl;
-    // Max矩阵可以由Need和Allocation矩阵推导得出
-    // Max[i,j]= Need[i,j]+Allocation[i,j]
-    for (int i = 0; i < p; i++)
-        for (int j = 0; j < r; j++)
-            maximum[i][j] = need[i][j] + allocation[i][j];
-    cout << "Input the available vector:" << endl;
-    for (int i = 0; i < r; i++)
-        cin >> available[i];
-}
-
-void output_func(int allocation[p][r], int need[p][r], int available[r])
-{
-    // 输出函数
-    cout << endl
-         << "     "
-         << "Allocation"
-         << "     Need"
-         << "        Available" << endl;
-    for (int i = 0; i < p; i++)
+    // 生成need矩阵，第i个进程的第j个资源还需要多少
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < m; j++)
+            need[i][j] = Max[i][j] - allocation[i][j];
+    // 输出每个进程需要的资源数量
+    cout << "\tMax   \t|\t"
+         << "\tAllo  \t|\t"
+         << "\tNeed  \t|\t"
+         << "\tAvalia\t" << endl;
+    for (int i = 0; i < n; i++)
     {
-        cout << "P" << i + 1 << "   :";
-        for (int j = 0; j < r; j++)
-        {
-            cout << allocation[i][j] << ' ';
-        }
-        cout << "     ";
-        for (int j = 0; j < r; j++)
-            cout << need[i][j] << ' ';
+        cout << "P" << i << "    \t";
+        for (int j = 0; j < m; j++)
+            cout << Max[i][j] << " ";
+        cout << "\t\t\t";
+        for (int j = 0; j < m; j++)
+            cout << allocation[i][j] << " ";
+        cout << "\t\t\t";
+        for (int j = 0; j < m; j++)
+            cout << need[i][j] << " ";
+        cout << "\t\t\t";
         if (i == 0)
         {
-            cout << "     ";
-            for (int k = 0; k < r; k++)
-                cout << available[k] << ' ';
+            for (int i = 0; i < m; i++)
+                cout << available[i] << " ";
+            cout << endl;
         }
-        cout << endl;
+        else
+            cout << endl;
     }
-    cout << endl;
 }
 
-bool compare(int need[], int work[])
+void print_sequence()
 {
-    bool flg = 1;
-    for (int i = 0; i < r; i++)
+    cout << "\tWork   \t|\t"
+         << "\tNeed  \t|\t"
+         << "\tAllo  \t|\t"
+         << "\tW+A  \t|\t"
+         << "\tFinish\t" << endl;
+    for (int i = 0; i < n; i++)
     {
-        // 检查是否有大于的情况存在
-        if (need[i] > work[i])
-        {
-            flg = 0;
-            break;
-        }
+        cout << "P" << i << "    \t";
+        for (int j = 0; j < m; j++)
+            cout << work[i][j] << " ";
+        cout << "\t\t\t";
+        for (int j = 0; j < m; j++)
+            cout << need[i][j] << " ";
+        cout << "\t\t\t";
+        for (int j = 0; j < m; j++)
+            cout << allocation[i][j] << " ";
+        cout << "\t\t\t";
+        for (int j = 0; j < m; j++)
+            cout << WaddA[i][j] << " ";
+        cout << "\t\t\t";
+        cout << finish[i] << endl;
     }
-    return flg;
 }
 
-int check_security(int allocation[p][r], int need[p][r], int available[r])
+bool safety()
 {
-    // 安全性检查函数
-    int finish[p] = {0}; // 初始化finish向量
-    int work[r];         // 拷贝available
-    int lis[p];          // 用来记录安全时的队列
-    int cnt = 0;
-    for (int i = 0; i < r; i++)
-        work[i] = available[i]; // 初始化work向量
-    // 序列分配
-    // 循环p次
-    for (int m = 0; m < p; m++)
+    // 初始化
+    int w = 0;
+    // 初始当前可用资源等于输入的系统内剩余的资源
+    for (int j = 0; j < m; j++)
+        worknow[j] = available[j];
+    // 将所有进程标为未完成
+    for (int i = 0; i < n; i++)
+        finish[i] = false;
+    int count = 0;
+    while (1)
     {
-        for (int i = 0; i < p; i++)
+        // 每次检查是否所有进程均完成
+        for (int i = 0; i < n; i++)
         {
-            // 如果当前进程执行完成，跳过
-            if (finish[i] == 1)
-                continue;
-            // 找到finish[i] = false
-            else
+            if (finish[i] == false)
             {
-                // 如果Need[i,j]<=Work[j]
-                if (compare(need[i], work))
+                // 若有未完成的试探其是否符合要求
+                int f1 = 1;
+                for (int j = 0; j < m; j++)
                 {
-                    for (int j = 0; j < r; j++)
-                        work[j] += allocation[i][j];
-                    finish[i] = 1;
-                    lis[cnt++] = i + 1; // 将该状态放入安全状态队列中
-                    break;
+                    // 若需求的大于当前系统内现有的资源，则不能分配
+                    if (need[i][j] > worknow[j])
+                    {
+                        f1 = 0;
+                    }
+                }
+                // 若可以分配
+                if (f1 == 1)
+                {
+                    for (int j = 0; j < m; j++)
+                    {
+                        // 记录
+                        work[i][j] = worknow[j];
+                        // 更新结束分配后当前系统内拥有的资源
+                        worknow[j] = worknow[j] + allocation[i][j];
+                        WaddA[i][j] = worknow[j];
+                    }
+                    finish[i] = true;
+                    // 记录可行的序列
+                    p[w++] = i;
+                    count = 0;
+                    cout << "第" << w << "次,分配给" << i << endl;
+                    print_sequence();
                 }
             }
         }
+        // 若能够分配，最多循环n轮，则count为n，退出
+        count++;
+        if (count >= n)
+            break;
     }
     int flag = 1;
-    for (int i = 0; i < r; i++)
-    {
-        if (finish[i] == 0)
-        {
+    for (int i = 0; i < n; i++)
+        if (finish[i] == false)
             flag = 0;
-            break; // 如果存在F的进程，表明系统处于不安全状态
-        }
-        else
-            continue;
-    }
-    if (flag)
-    {
-        cout << "系统处于安全状态！" << endl;
-        cout << "安全序列为:";
-        for (int i = 0; i < p; i++)
-            cout << lis[i] << ' ';
-        cout << endl;
-    }
+    if (flag == 1)
+        return true;
     else
-        cout << "系统处于不安全状态！" << endl;
-    return flag;
+        return false;
 }
 
-void banker(int allocation[p][r], int need[p][r], int available[r], int request[r], int n)
+bool isFinish = 0;
+
+void Banker()
 {
-    if (!compare(request, need[n]))
+    cout << "输入请求资源的进程号(0/1/2...):" << endl;
+    int pid;
+    while (true)
     {
-        // 如果存在Requesti[j]>Need[i][j],认为出错
-        cout << "出错！所需资源已超过所宣布的最大值！" << endl;
-        return;
+        cin >> pid;
+        if (pid < 0 || pid >= n)
+            cout << "请输入正确的进程号！" << endl;
+        else
+            break;
     }
-    else
+    cout << "输入请求资源的数量(" << m << "类资源,空格隔开):";
+    for (int j = 0; j < m; j++)
     {
-        // 银行家算法(1)没有出错
-        if (!compare(request, available))
+        cin >> request[pid][j];
+    }
+    for (int j = 0; j < m; j++)
+    {
+        if (request[pid][j] > need[pid][j])
         {
-            // 如果存在Requesti[j]>Available[j]，认为出错
-            cout << "尚无足够资源，必须等待！" << endl;
+            cout << "请求资源数量大于Need数量,分配失败!" << endl;
             return;
         }
         else
         {
-            for (int j = 0; j < r; j++)
+            if (request[pid][j] > available[j])
             {
-                available[j] -= request[j];
-                allocation[n][j] += request[j];
-                need[n][j] -= request[j];
-            }
-            if (check_security(allocation, need, available))
-            {
-                cout << "安全！将资源正式分配" << endl;
-            }
-            else
-            {
-                cout << "不安全！资源分配作废！恢复以前状态" << endl;
-                for (int j = 0; j < r; j++)
-                {
-                    need[n][j] += request[j];
-                    allocation[n][j] -= request[j];
-                    available[j] += request[j];
-                }
+                cout << "请求资源数量大于Aailable数量,分配失败!" << endl;
+                return;
             }
         }
     }
-    output_func(allocation, need, available);
+    cout << "初始资源分配情况：" << endl;
+    print_sequence();
+    // 试着分给他资源
+    for (int j = 0; j < m; j++)
+    {
+        available[j] = available[j] - request[pid][j];
+        allocation[pid][j] = allocation[pid][j] + request[pid][j];
+        need[pid][j] = need[pid][j] - request[pid][j];
+    }
+    cout << "试着将资源分配给他" << endl;
+    print_sequence();
+    cout << "检查系统安全性" << endl;
+    bool safe = safety();
+    if (safe == true)
+    {
+        // 打印
+        cout << "存在一个安全的分配序列！\n"
+             << endl;
+        for (int i = 0; i < n; i++)
+        {
+            cout << p[i] << "->"[i == n - 1];
+        }
+        cout << "\n请求成功! !" << endl;
+        isFinish = 1;
+        return;
+    }
+    else
+    {
+        cout << "此次请求会导致死锁！请求失败！！" << endl;
+        // 恢复现场，不分配
+        for (int j = 0; j < m; j++)
+        {
+            available[j] = available[j] + request[pid][j];
+            allocation[pid][j] = allocation[pid][j] - request[pid][j];
+            need[pid][j] = need[pid][j] + request[pid][j];
+        }
+    }
+}
+
+void noPrevention()
+{
+    cout << "输入请求资源的进程号(0/1/2...):\n";
+    int pid;
+    while (true)
+    {
+        cin >> pid;
+        if (pid < 0 || pid >= n)
+            cout << "请输入正确的进程号！" << endl;
+        else
+            break;
+    }
+    cout << "输入请求资源的数量(" << m << "类资源,空格隔开):";
+    for (int j = 0; j < m; j++)
+    {
+        cin >> request[pid][j];
+    }
+    for (int j = 0; j < m; j++)
+    {
+        if (request[pid][j] > need[pid][j])
+        {
+            cout << "请求资源数量大于Need数量,分配失败!" << endl;
+            return;
+        }
+        else
+        {
+
+            if (request[pid][j] > available[j])
+            {
+                cout << "请求资源数量大于Aailable数量,分配失败!" << endl;
+                return;
+            }
+        }
+    }
+    cout << "初始资源分配情况：" << endl;
+    // 分给他资源
+    for (int j = 0; j < m; j++)
+    {
+        available[j] = available[j] - request[pid][j];
+        allocation[pid][j] = allocation[pid][j] + request[pid][j];
+        need[pid][j] = need[pid][j] - request[pid][j];
+    }
+    cout << "将资源分配给他\n";
+    print_sequence();
+    // 检查是否发生死锁
+    bool f = true;
+    for (int i = 0; i < n; i++)
+    {
+        bool check = 0;
+        for (int j = 0; j < m; j++)
+        {
+            if (available[j] < need[i][j])
+            {
+                check = 1;
+                break;
+            }
+        }
+        if (check == 0)
+            f = false;
+    }
+    if (f)
+        cout << "发生了死锁！ \n";
+    else
+        cout << "当前尚未发生死锁\n";
 }
 
 int main()
 {
-    int maximum[p][r], allocation[p][r], need[p][r];
-    int available[r], request[r];
-    init_matrix(maximum, allocation, need, available, request);
-    cout << endl
-         << "检查T0时刻系统是否处于安全状态..." << endl;
-    check_security(allocation, need, available);
-    int flag = 1;
-    while (flag)
+    int f = 1;
+    cout << "请问您是否想要启用防止死锁算法（银行家算法）？(y/n)" << endl
+         << "请输入(y/n):";
+    cin >> ch;
+    bool isinit = 0;
+    while (1)
     {
-        cout << endl
-             << "对请求资源进行银行家算法检查..." << endl;
-        init_request(request); // 初始化request矩阵
-        banker(allocation, need, available, request, num);
-        cout << "是否继续输入？(输入0退出):";
-        cin >> flag;
+        int select;
+        menu();
+        cout << "\n";
+        if (isinit == 1)
+            print(); // 实时显示
+        cout << "\t  请选择:";
+        cin >> select;
+        switch (select)
+        {
+        case 1:
+            init();
+            isinit = 1;
+            break;
+        case 2:
+            if (isinit == 0)
+                cout << "请先初始化！" << endl;
+            else
+                print();
+            break;
+        case 3:
+        {
+            if (isinit == 0)
+                cout << "请先初始化！" << endl;
+            else
+            {
+                if (ch == 'y')
+                {
+                    Banker();
+                }
+                else
+                {
+                    noPrevention();
+                }
+            }
+            break;
+        }
+        case 4:
+            f = 0;
+            break;
+        }
+        if (f == 0)
+            break;
+        system("pause");
+        system("cls");
     }
 
     return 0;
 }
-/*测试数据
-Allocation:
-3 1 1 2
-0 1 0 2
-1 0 3 3
-3 2 0 1
-2 1 1 1
-Need:
-0 0 2 0
-2 1 1 2
-1 0 0 1
-2 0 1 1
-1 0 1 0
-Available:
-1 0 2 1
+
+/*
+可行：
+1
+1 0 2
+
+不可行：
+0
+3 2 1
 */

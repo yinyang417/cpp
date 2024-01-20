@@ -219,9 +219,10 @@ void openFile() {
 	else {
 		bool success = 1;
 		while (true) {
-			cout << "请输入此次打开的二级保护码：";
+			//cout << "请输入此次打开的二级保护码：";
 			string code;
-			cin >> code;
+			code = mfd[nowuser].f[fileId].p_code;
+			//cin >> code;
 			//验证二级保护码
 			for (int i = 0; i < 3; i++) {
 				if (code[i] > mfd[nowuser].f[fileId].p_code[i]||code[i]<'0' || code[i]>'1') {
@@ -296,7 +297,7 @@ void writeFile() {
 		//检查是否有写权限
 		if (mfd[nowuser].f[fileId].p_code_tow[1] != '1') cout << "无写权限！写入文件失败！" << endl;
 		else {
-			cout << "请输入写入文件内容长度(9位以内)：";
+			cout << "请输入写入文件内容长度(9位以内):";
 			int length = 0;
 			cin >> length;
 			mfd[nowuser].f[fileId].file_length += length;
@@ -415,10 +416,12 @@ int main() {
 			system("pause");
 			break;
 		}
+		
 		system("cls");
+
 		if (bye == 1) {
 			showfile();
-			cout << "GOOD BYE！\n";
+			cout << "GOOD BYE!" << endl;
 			break;
 		}
 	}
